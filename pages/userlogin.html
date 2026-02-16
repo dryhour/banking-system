@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        header {
+            background-color: #333;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            text-justify: auto;
+            border-radius: 5px;
+        }
+        h2 {
+            text-align: center;
+        }
+        button {
+            background-color: #333;
+            color: white;
+            padding: 8px;
+            text-align: center;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            margin: 10px auto;
+            width: 200px;
+        }
+        input {
+            padding: 8px;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            margin: 10px auto;
+            width: 200px;
+        }
+        main {
+            background-color: white;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>User Login</h1>
+    </header>
+    <main>
+        <h2>Please enter your credentials.</h2>
+
+        <input placeholder="Username" id="username"></input>
+        <input placeholder="Password" id="password"></input>
+
+        <button>Login</button>
+        <button onclick="window.location.href='index.html'">Return</button>
+    </main>
+</body>
+</html>
