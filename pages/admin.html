@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
+    <title>Bank</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -26,7 +26,7 @@
         button {
             background-color: #333;
             color: white;
-            padding: 8px;
+            padding: 10px;
             text-align: center;
             border-radius: 5px;
             display: flex;
@@ -34,13 +34,16 @@
             margin: 10px auto;
             width: 200px;
         }
-        input {
-            padding: 8px;
-            text-align: left;
+        button.button1 {
+            background-color: #333;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px;
             display: flex;
             flex-direction: column;
             margin: 10px auto;
-            width: 200px;
+            width: 250px;
         }
         main {
             background-color: white;
@@ -53,37 +56,16 @@
 </head>
 <body>
     <header>
-        <h1>Admin Login</h1>
+        <h1>Admin</h1>
     </header>
     <main>
-        <h2>Please enter your credentials.</h2>
+        <h2>Welcome to the admin page. You can open, close, and modify bank accounts here.</h2>
 
-        <input placeholder="admin" id="username"></input>
-        <input placeholder="password123" id="password"></input>
+        <button class="button1">Open Account</button>
+        <button class="button1">Close Account</button>
+        <button class="button1">Modify Account</button>
 
-        <button onclick="handleClick()">Login</button>
         <button onclick="window.location.href='index.html'">Return</button>
-        <script>
-        function handleClick() {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-
-            fetch('/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
-            })
-            .then(r => r.text())
-            .then(data => {
-                console.log('Server says:', data)
-                if (data == 'success') {
-                    window.location.href='admin.html'
-                } else {
-                    alert('Username or password is incorrect. Try again.')
-                }
-            });
-        }
-        </script>
     </main>
 </body>
 </html>
