@@ -76,7 +76,8 @@
             .then(r => r.text())
             .then(data => {
                 console.log('Server says:', data)
-                if (data == 'success') {
+                if (data !== 'fail') {
+                    localStorage.setItem('sessionToken', data);
                     window.location.href='admin.html'
                 } else {
                     alert('Username or password is incorrect. Try again.')

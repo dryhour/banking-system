@@ -12,8 +12,27 @@
 
 #include <mysqlx/xdevapi.h>
 
+#include <random>
+#include <set>
+
 const int PORT = 8080;
 const std::string PATH = "../pages/";
+
+std::set<std::string> activeSessions;
+std::string generateToken() {
+    const std::string availableCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    std::string generatedString;
+
+    std::random_device seed;
+    std::mt19937 gen{seed()};
+    std::uniform_int_distribution<int> dist(0, availableCharacters.length() - 1);
+
+    for (int i = 0; i < 32; i++) {
+        generatedString += availableCharacters[dist(gen)];  
+    };
+
+    return generatedString;
+}
 
 time_t getFileModTime(const std::string& filename) {
     struct stat fileInfo;
@@ -138,7 +157,9 @@ std::string handleLogin(mysqlx::Session& session, const std::string& request) {
     std::string password = getValue("password");
 
     if (checkLogin(session, username, password, "admin")) {
-        return "success";
+        std::string token = generateToken();
+        activeSessions.insert(token);
+        return token;
     }
     return "fail";
 }
@@ -208,6 +229,21 @@ int main() {
             } else if (request.find("POST /login") != std::string::npos) {
                 std::string result = handleLogin(session, request);
                 response = createHttpResponse(result, "text/plain");
+            } else if (request.find("GET /verify") != std::string::npos) {
+                size_t pos = request.find("token=");
+                if (pos != std::string::npos) {
+                    size_t start = pos + 6;
+                    size_t end = request.find(" ", start);
+                    std::string token = request.substr(start, end - start);
+                    
+                    if (activeSessions.count(token) > 0) {
+                        response = createHttpResponse("valid", "text/plain");
+                    } else {
+                        response = createHttpResponse("invalid", "text/plain");
+                    }
+                } else {
+                    response = createHttpResponse("invalid", "text/plain");
+                }
             } else {
                 std::string requestedFile = getRequestedFile(request);
                 
