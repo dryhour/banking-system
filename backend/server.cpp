@@ -18,7 +18,7 @@
 const int PORT = 8080;
 const std::string PATH = "../pages/";
 
-std::set<std::string> activeSessions;
+std::map<std::string, std::pair<std::string, std::string>> activeSessions;
 std::string generateToken() {
     const std::string availableCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     std::string generatedString;
@@ -29,7 +29,7 @@ std::string generateToken() {
 
     for (int i = 0; i < 32; i++) {
         generatedString += availableCharacters[dist(gen)];  
-    };
+    }
 
     return generatedString;
 }
@@ -141,6 +141,19 @@ std::string urlDecode(const std::string& str) {
     return result;
 }
 
+std::string getUsername(const std::string& body) {
+    auto getValue = [&](const std::string& key) {
+        size_t pos = body.find(key + "=");
+        if (pos == std::string::npos) return std::string("");
+        size_t start = pos + key.length() + 1;
+        size_t end = body.find('&', start);
+        return urlDecode(body.substr(start, end == std::string::npos ? end : end - start));
+    };
+
+    std::string username = getValue("username");
+    return username;
+}
+
 std::string handleLogin(mysqlx::Session& session, const std::string& request) {
     size_t bodyStart = request.find("\r\n\r\n");
     std::string body = (bodyStart != std::string::npos) ? request.substr(bodyStart + 4) : "";
@@ -155,10 +168,11 @@ std::string handleLogin(mysqlx::Session& session, const std::string& request) {
 
     std::string username = getValue("username");
     std::string password = getValue("password");
+    std::string user_type = getValue("user_type");
 
-    if (checkLogin(session, username, password, "admin")) {
+    if (checkLogin(session, username, password, user_type)) {
         std::string token = generateToken();
-        activeSessions.insert(token);
+        activeSessions[token] = {username, user_type};
         return token;
     }
     return "fail";
@@ -181,6 +195,11 @@ int main() {
         session.sql(
             "INSERT IGNORE INTO users (username, password, user_type) "
             "VALUES ('admin', 'password123', 'admin')"
+        ).execute();
+
+        session.sql(
+            "INSERT IGNORE INTO users (username, password, user_type) "
+            "VALUES ('user2', 'test', 'user')"
         ).execute();
 
         int server_fd, client_fd;
@@ -233,11 +252,14 @@ int main() {
                 size_t pos = request.find("token=");
                 if (pos != std::string::npos) {
                     size_t start = pos + 6;
-                    size_t end = request.find(" ", start);
+                    size_t end = request.find("&", start);
+                    if (end == std::string::npos) end = request.find(" ", start);
                     std::string token = request.substr(start, end - start);
                     
-                    if (activeSessions.count(token) > 0) {
-                        response = createHttpResponse("valid", "text/plain");
+                    auto it = activeSessions.find(token);
+                    if (it != activeSessions.end()) {
+                        std::string responseData = it->second.first + "&" + it->second.second;
+                        response = createHttpResponse(responseData, "text/plain");
                     } else {
                         response = createHttpResponse("invalid", "text/plain");
                     }

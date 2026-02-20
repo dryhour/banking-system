@@ -9,9 +9,16 @@
             fetch('/verify?token=' + token)
                 .then(r => r.text())
                 .then(data => {
-                    if (data !== 'valid') {
+                    if (data === 'invalid') {
                         localStorage.removeItem('sessionToken');
                         window.location.href = 'adminlogin.html';
+                    } else {
+                        const [username, user_type] = data.split('&');
+                        if (user_type === 'admin') {
+                            document.querySelector('header h2').textContent = `(Logged in as ${username})`;
+                        } else {
+                            window.location.href = 'adminlogin.html';
+                        }
                     }
                 });
         }
@@ -72,6 +79,7 @@
 <body>
     <header>
         <h1>Admin</h1>
+        <h2>(User)</h2>
     </header>
     <main>
         <h2>Welcome to the admin page. You can open, close, and modify bank accounts here.</h2>
