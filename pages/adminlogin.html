@@ -58,20 +58,34 @@
     <main>
         <h2>Please enter your credentials.</h2>
 
-        <input placeholder="admin" id="username"></input>
-        <input placeholder="password123" id="password"></input>
+        <input 
+            type="text" 
+            placeholder="Account Number" 
+            id="account_number"
+            maxlength="12"
+            inputmode="numeric"
+            oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+        ></input>
+        <input 
+            type="password" 
+            placeholder="PIN" 
+            id="pin"
+            maxlength="4"
+            inputmode="numeric"
+            oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+        ></input>
 
         <button onclick="handleClick()">Login</button>
         <button onclick="window.location.href='index.html'">Return</button>
         <script>
         function handleClick() {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
+            const account_number = document.getElementById('account_number').value;
+            const pin = document.getElementById('pin').value;
 
             fetch('/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&user_type=admin`
+                body: `account_number=${encodeURIComponent(account_number)}&pin=${encodeURIComponent(pin)}&user_type=admin`
             })
             .then(r => r.text())
             .then(data => {
@@ -80,11 +94,16 @@
                     localStorage.setItem('sessionToken', data);
                     window.location.href='admin.html'
                 } else {
-                    alert('Username or password is incorrect. Try again.')
+                    alert('Account number or pin is incorrect. Try again.')
                 }
             });
         }
         </script>
+    </main>
+    <main>
+        <h4>
+            (Hint: The admin account number is 1 and the admin PIN is 1234.)
+        </h4>
     </main>
 </body>
 </html>

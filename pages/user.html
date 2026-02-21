@@ -13,16 +13,16 @@
                         localStorage.removeItem('sessionToken');
                         window.location.href = 'userlogin.html';
                     } else {
-                        const [username, user_type] = data.split('&');
+                        const [account_number, user_type] = data.split('&');
                         if (user_type === 'user') {
-                            document.querySelector('header h2').textContent = `(Logged in as ${username})`;
+                            document.querySelector('header h2').textContent = `(Account number ${account_number})`;
                         } else {
                             window.location.href = 'userlogin.html';
                         }
                     }
                 });
         }
-        </script>
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bank</title>
@@ -45,6 +45,9 @@
         h2 {
             text-align: center;
         }
+        h4 {
+            text-align: center;
+        }
         button {
             background-color: #333;
             color: white;
@@ -59,7 +62,7 @@
         button.button1 {
             background-color: #333;
             color: white;
-            padding: 20px;
+            padding: 5px;
             text-align: center;
             border-radius: 5px;
             display: flex;
@@ -74,6 +77,14 @@
             border-radius: 5px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
+        input {
+            padding: 8px;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            margin: 10px auto;
+            width: 200px;
+        }
     </style>
 </head>
 <body>
@@ -82,11 +93,59 @@
         <h2>(User)</h2>
     </header>
     <main>
-        <h2>Welcome to the user page. You can deposit, withdraw, and check your balance here.</h2>
+        <h2>Here you can deposit, withdraw, and view your balance.</h2>
 
-        <button class="button1">idk</button>
+        <input placeholder="Account number" id="account_number"></input>
+        <input placeholder="PIN" id="pin"></input>
 
+        <button onclick="adminFunctions('open')" class="button1">Open Account</button>
+        <button onclick="adminFunctions('close')" class="button1">Close Account</button>
+        <button onclick="adminFunctions('modify')" class="button1">Modify Account</button>
         <button onclick="window.location.href='index.html'">Return</button>
+        
     </main>
+    <main>
+        <h4>
+            Open: creates a new account based on ACCOUNT NUMBER and PIN input <br> <br>
+            Close: closes an account based on ACCOUNT NUMBER input <br> <br>
+            Modify: prompts to change pin based on ACCOUNT NUMBER input
+        </h4>
+    </main>
+    <script>
+        function adminFunctions(type) {
+            const account_number = document.getElementById('account_number').value;
+            const pin = document.getElementById('pin').value;
+
+            if (account_number === "" || (type === 'open' && pin === "")) {
+                return;
+            }
+            
+            const newPin = (type === "modify") ? prompt("What would you like to change the pin to?") || "" : "";
+            const error_message = {
+                ['open']:'User already exists.',
+                ['close']:'Could not find user. Username or pin is incorrect.',
+                ['modify']:'Username or pin is incorrect. Try again.',
+            }
+            const success_message = {
+                ['open']:'User account successfully opened.',
+                ['close']:'User account successfully closed.',
+                ['modify']:'User account successfully modified.',
+            }
+            fetch('/adminFunctions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `account_number=${encodeURIComponent(account_number)}&pin=${encodeURIComponent(pin)}&type=${type}&newPin=${newPin}`
+                })
+                .then(r => r.text())
+                .then(data => {
+                    console.log('Server says:', data);
+                    if (data !== 'fail') {
+                        alert(success_message[type]);
+                    } else {
+                        alert(error_message[type]);
+                    }
+                });
+        }
+    </script>
 </body>
 </html>

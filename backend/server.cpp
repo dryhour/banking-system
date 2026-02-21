@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <thread>
 #include <chrono>
+#include <algorithm>
 
 #include <mysqlx/xdevapi.h>
 
@@ -109,10 +110,10 @@ std::string createHttpResponse(const std::string& content, const std::string& co
     return response.str();
 }
 
-bool checkLogin(mysqlx::Session& session, const std::string& username, const std::string& password, const std::string& typeUser) {
+bool checkLogin(mysqlx::Session& session, const std::string& account_number, const std::string& pin, const std::string& typeUser) {
     try {
-        auto result = session.sql("SELECT * FROM users WHERE username=? AND password=? AND user_type=?")
-            .bind(username, password, typeUser)
+        auto result = session.sql("SELECT * FROM users WHERE account_number=? AND pin=? AND user_type=?")
+            .bind(account_number, pin, typeUser)
             .execute();
         
         return result.count() > 0;
@@ -150,8 +151,8 @@ std::string getUsername(const std::string& body) {
         return urlDecode(body.substr(start, end == std::string::npos ? end : end - start));
     };
 
-    std::string username = getValue("username");
-    return username;
+    std::string account_number = getValue("account_number");
+    return account_number;
 }
 
 std::string handleLogin(mysqlx::Session& session, const std::string& request) {
@@ -166,14 +167,83 @@ std::string handleLogin(mysqlx::Session& session, const std::string& request) {
         return urlDecode(body.substr(start, end == std::string::npos ? end : end - start));
     };
 
-    std::string username = getValue("username");
-    std::string password = getValue("password");
+    std::string account_number = getValue("account_number");
+    std::string pin = getValue("pin");
     std::string user_type = getValue("user_type");
 
-    if (checkLogin(session, username, password, user_type)) {
+    if (checkLogin(session, account_number, pin, user_type)) {
         std::string token = generateToken();
-        activeSessions[token] = {username, user_type};
+        activeSessions[token] = {account_number, user_type};
         return token;
+    }
+    return "fail";
+}
+
+bool checkAdminFunction(
+    mysqlx::Session& session, 
+    const std::string& account_number, 
+    const std::string& pin, 
+    const std::string& type,
+    const std::string& newPin
+) {
+    try {
+        auto result = session.sql("SELECT * FROM users WHERE account_number=? AND pin=? AND user_type=?")
+            .bind(account_number, pin, "user")
+            .execute();
+
+        std::string lowerUsername = account_number;
+        std::transform(lowerUsername.begin(), lowerUsername.end(), lowerUsername.begin(), ::tolower);
+
+        if (lowerUsername == "admin") {
+            return false;
+        }
+        
+        bool userExists = result.count() > 0;
+        if (type == "open" and not userExists) {
+            session.sql(
+                "INSERT IGNORE INTO users (account_number, pin, user_type) "
+                "VALUES (?, ?, 'user')"
+            ).bind(account_number, pin).execute();
+            return true;
+        } else if (type == "close" and userExists) {
+            session.sql(
+                "DELETE FROM users WHERE account_number=?"
+            ).bind(account_number)
+            .execute();
+            return true;
+        } else if (type == "modify" and userExists) {
+            session.sql(
+                "UPDATE users SET pin = ? WHERE account_number=?"
+            ).bind(newPin, account_number)
+            .execute();
+            return true;
+        }
+        return false;
+    } catch (const mysqlx::Error &err) {
+        std::cerr << "SQL error: " << err << std::endl;
+        return false;
+    }
+}
+
+std::string handleAdminFunction(mysqlx::Session& session, const std::string& request) {
+    size_t bodyStart = request.find("\r\n\r\n");
+    std::string body = (bodyStart != std::string::npos) ? request.substr(bodyStart + 4) : "";
+
+    auto getValue = [&](const std::string& key) {
+        size_t pos = body.find(key + "=");
+        if (pos == std::string::npos) return std::string("");
+        size_t start = pos + key.length() + 1;
+        size_t end = body.find('&', start);
+        return urlDecode(body.substr(start, end == std::string::npos ? end : end - start));
+    };
+
+    std::string account_number = getValue("account_number");
+    std::string pin = getValue("pin");
+    std::string type = getValue("type");
+    std::string newPin = getValue("newPin");
+
+    if (checkAdminFunction(session, account_number, pin, type, newPin)) {
+        return "success";
     }
     return "fail";
 }
@@ -187,19 +257,15 @@ int main() {
         session.sql(
             "CREATE TABLE IF NOT EXISTS users ("
             "id INT AUTO_INCREMENT PRIMARY KEY,"
-            "username VARCHAR(50) UNIQUE NOT NULL,"
-            "password VARCHAR(255) NOT NULL,"
-            "user_type VARCHAR(20) NOT NULL)"
+            "account_number VARCHAR(50) UNIQUE NOT NULL,"
+            "pin VARCHAR(10) NOT NULL,"
+            "user_type VARCHAR(20) NOT NULL,"
+            "balance DECIMAL(10,2) NOT NULL DEFAULT 0.00)"
         ).execute();
 
         session.sql(
-            "INSERT IGNORE INTO users (username, password, user_type) "
-            "VALUES ('admin', 'password123', 'admin')"
-        ).execute();
-
-        session.sql(
-            "INSERT IGNORE INTO users (username, password, user_type) "
-            "VALUES ('user2', 'test', 'user')"
+                "INSERT IGNORE INTO users (account_number, pin, user_type) "
+                "VALUES (1, 1234, 'admin')"
         ).execute();
 
         int server_fd, client_fd;
@@ -247,6 +313,9 @@ int main() {
                 response = createHttpResponse("ok", "text/plain");
             } else if (request.find("POST /login") != std::string::npos) {
                 std::string result = handleLogin(session, request);
+                response = createHttpResponse(result, "text/plain");
+            } else if (request.find("POST /adminFunctions") != std::string::npos) {
+                std::string result = handleAdminFunction(session, request);
                 response = createHttpResponse(result, "text/plain");
             } else if (request.find("GET /verify") != std::string::npos) {
                 size_t pos = request.find("token=");
