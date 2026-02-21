@@ -11,6 +11,10 @@
 #include <chrono>
 #include <algorithm>
 
+#include <format>
+#include <sstream>
+#include <iomanip>
+
 #include <mysqlx/xdevapi.h>
 
 #include <random>
@@ -194,7 +198,7 @@ bool checkAdminFunction(
         std::string lowerUsername = account_number;
         std::transform(lowerUsername.begin(), lowerUsername.end(), lowerUsername.begin(), ::tolower);
 
-        if (lowerUsername == "admin") {
+        if (lowerUsername == "1") {
             return false;
         }
         
@@ -244,6 +248,74 @@ std::string handleAdminFunction(mysqlx::Session& session, const std::string& req
 
     if (checkAdminFunction(session, account_number, pin, type, newPin)) {
         return "success";
+    }
+    return "fail";
+}
+
+double getBalance(mysqlx::Session& session, const std::string& account_number) {
+    auto result = session.sql("SELECT balance FROM users WHERE account_number=? AND user_type=?")
+        .bind(account_number, "user")
+        .execute();
+    
+    bool userExists = result.count() > 0;
+    auto row = result.fetchOne();
+    if (row and userExists) {
+        double balance = row[0].get<double>();
+        return balance;
+    }
+    return -1;
+}
+
+std::string formatBalance(double balance) {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(2) << balance;
+    return oss.str();
+}
+
+double checkUserFunction(mysqlx::Session& session, const std::string& account_number, const double& amount, const std::string& type) {
+    try {
+        double balance = getBalance(session, account_number);
+        if (balance >= 0) {  // changed from > 0 to >= 0 (allow zero balance for deposits)
+            if (type == "deposit") {
+                const double newBalance = balance + amount;
+                session.sql("UPDATE users SET balance = ? WHERE account_number = ?")
+                .bind(newBalance, account_number)
+                .execute();
+                return newBalance;
+            } else if (type == "withdraw" && balance >= amount) {  // use && instead of 'and'
+                const double newBalance = balance - amount;
+                session.sql("UPDATE users SET balance = ? WHERE account_number = ?")
+                .bind(newBalance, account_number)
+                .execute();
+                return newBalance;
+            }
+        }
+        return -1;  // return -1 for failure instead of false
+    } catch (const mysqlx::Error &err) {
+        std::cerr << "SQL error: " << err << std::endl;
+        return -1;
+    }
+}
+
+std::string handleUserFunction(mysqlx::Session& session, const std::string& request) {
+    size_t bodyStart = request.find("\r\n\r\n");
+    std::string body = (bodyStart != std::string::npos) ? request.substr(bodyStart + 4) : "";
+
+    auto getValue = [&](const std::string& key) {
+        size_t pos = body.find(key + "=");
+        if (pos == std::string::npos) return std::string("");
+        size_t start = pos + key.length() + 1;
+        size_t end = body.find('&', start);
+        return urlDecode(body.substr(start, end == std::string::npos ? end : end - start));
+    };
+
+    std::string account_number = getValue("account_number");
+    double amount = std::stod(getValue("amount"));
+    std::string type = getValue("type");
+
+    const double newBalance = checkUserFunction(session, account_number, amount, type);
+    if (newBalance >= 0) {
+        return formatBalance(newBalance);
     }
     return "fail";
 }
@@ -317,6 +389,9 @@ int main() {
             } else if (request.find("POST /adminFunctions") != std::string::npos) {
                 std::string result = handleAdminFunction(session, request);
                 response = createHttpResponse(result, "text/plain");
+             } else if (request.find("POST /userFunctions") != std::string::npos) {
+                std::string result = handleUserFunction(session, request);
+                response = createHttpResponse(result, "text/plain");
             } else if (request.find("GET /verify") != std::string::npos) {
                 size_t pos = request.find("token=");
                 if (pos != std::string::npos) {
@@ -327,8 +402,14 @@ int main() {
                     
                     auto it = activeSessions.find(token);
                     if (it != activeSessions.end()) {
-                        std::string responseData = it->second.first + "&" + it->second.second;
-                        response = createHttpResponse(responseData, "text/plain");
+                        std::string account_number = it->second.first;
+                        double balance = getBalance(session, account_number);
+                        if (balance >= 0) {
+                            std::string responseData = account_number + "&" + it->second.second + "&" + formatBalance(balance);
+                            response = createHttpResponse(responseData, "text/plain");
+                        } else {
+                            response = createHttpResponse("invalid", "text/plain");
+                        }
                     } else {
                         response = createHttpResponse("invalid", "text/plain");
                     }

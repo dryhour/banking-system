@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <script>
+        let currentAccountNumber = "";
         const token = localStorage.getItem('sessionToken');
         if (!token) {
             window.location.href = 'userlogin.html';
@@ -13,9 +14,11 @@
                         localStorage.removeItem('sessionToken');
                         window.location.href = 'userlogin.html';
                     } else {
-                        const [account_number, user_type] = data.split('&');
+                        const [account_number, user_type, balance] = data.split('&');
+                        currentAccountNumber = account_number;
                         if (user_type === 'user') {
                             document.querySelector('header h2').textContent = `(Account number ${account_number})`;
+                            document.querySelector('main h2').textContent = `Your Balance: $${balance}`;
                         } else {
                             window.location.href = 'userlogin.html';
                         }
@@ -93,53 +96,53 @@
         <h2>(User)</h2>
     </header>
     <main>
-        <h2>Here you can deposit, withdraw, and view your balance.</h2>
+        <h4>Here you can deposit, withdraw, and view your balance.</h4>
+        <h2>Your Balance: $0</h2>
 
-        <input placeholder="Account number" id="account_number"></input>
-        <input placeholder="PIN" id="pin"></input>
-
-        <button onclick="adminFunctions('open')" class="button1">Open Account</button>
-        <button onclick="adminFunctions('close')" class="button1">Close Account</button>
-        <button onclick="adminFunctions('modify')" class="button1">Modify Account</button>
+        <button onclick="userFunctions('deposit')" class="button1">Deposit</button>
+        <button onclick="userFunctions('withdraw')" class="button1">Withdraw</button>
         <button onclick="window.location.href='index.html'">Return</button>
         
     </main>
-    <main>
-        <h4>
-            Open: creates a new account based on ACCOUNT NUMBER and PIN input <br> <br>
-            Close: closes an account based on ACCOUNT NUMBER input <br> <br>
-            Modify: prompts to change pin based on ACCOUNT NUMBER input
-        </h4>
-    </main>
     <script>
-        function adminFunctions(type) {
-            const account_number = document.getElementById('account_number').value;
-            const pin = document.getElementById('pin').value;
-
-            if (account_number === "" || (type === 'open' && pin === "")) {
-                return;
+        function userFunctions(type) {
+            let amount = 0;
+            if (type === "deposit") {
+                const input = prompt("Enter amount to deposit:");
+                if (input && /^\d+(\.\d{1,2})?$/.test(input) && parseFloat(input) > 0) {
+                    amount = parseFloat(input).toFixed(2);
+                } else {
+                    alert("Amount must be a positive number with up to 2 decimal places (ex 100.00)");
+                    return;
+                }
+            } else if (type === "withdraw") {
+                const input = prompt("Enter amount to withdraw:");
+                if (input && /^\d+(\.\d{1,2})?$/.test(input) && parseFloat(input) > 0) {
+                    amount = parseFloat(input).toFixed(2);
+                } else {
+                    alert("Amount must be a positive number with up to 2 decimal places (ex 100.00)");
+                    return;
+                }
             }
-            
-            const newPin = (type === "modify") ? prompt("What would you like to change the pin to?") || "" : "";
+
             const error_message = {
-                ['open']:'User already exists.',
-                ['close']:'Could not find user. Username or pin is incorrect.',
-                ['modify']:'Username or pin is incorrect. Try again.',
+                ['deposit']:'Something went wrong. Try again.',
+                ['withdraw']:'Could not withdraw. Amount insufficient.',
             }
             const success_message = {
-                ['open']:'User account successfully opened.',
-                ['close']:'User account successfully closed.',
-                ['modify']:'User account successfully modified.',
+                ['deposit']:'Amount successfully deposited.',
+                ['withdraw']:'Amount successfully withdrawn.',
             }
-            fetch('/adminFunctions', {
+            fetch('/userFunctions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `account_number=${encodeURIComponent(account_number)}&pin=${encodeURIComponent(pin)}&type=${type}&newPin=${newPin}`
+                    body: `account_number=${currentAccountNumber}&amount=${encodeURIComponent(amount)}&type=${type}`
                 })
                 .then(r => r.text())
                 .then(data => {
                     console.log('Server says:', data);
                     if (data !== 'fail') {
+                        document.querySelector('main h2').textContent = `Your Balance: $${data}`;
                         alert(success_message[type]);
                     } else {
                         alert(error_message[type]);
