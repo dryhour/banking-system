@@ -6,12 +6,13 @@
         if (!token) {
             window.location.href = 'adminlogin.html';
         } else {
-            fetch('/verify?token=' + token)
+            fetch('/verifyAdmin?token=' + token)
                 .then(r => r.text())
                 .then(data => {
                     if (data === 'invalid') {
                         localStorage.removeItem('sessionToken');
-                        window.location.href = 'adminlogin.html';
+                        // window.location.href = 'adminlogin.html';
+                        console.log('Invalid token, please log in again.');
                     } else {
                         const [account_number, user_type] = data.split('&');
                         if (user_type === 'admin') {

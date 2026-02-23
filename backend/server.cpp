@@ -416,6 +416,25 @@ int main() {
                 } else {
                     response = createHttpResponse("invalid", "text/plain");
                 }
+            } else if (request.find("GET /verifyAdmin") != std::string::npos) {
+                size_t pos = request.find("token=");
+                if (pos != std::string::npos) {
+                    size_t start = pos + 6;
+                    size_t end = request.find("&", start);
+                    if (end == std::string::npos) end = request.find(" ", start);
+                    std::string token = request.substr(start, end - start);
+                    
+                    auto it = activeSessions.find(token);
+                    if (it != activeSessions.end()) {
+                        std::string account_number = it->second.first;
+                        std::string responseData = account_number + "&" + it->second.second + "&";
+                        response = createHttpResponse(responseData, "text/plain");
+                    } else {
+                        response = createHttpResponse("invalid", "text/plain");
+                    }
+                } else {
+                    response = createHttpResponse("invalid", "text/plain");
+                }
             } else {
                 std::string requestedFile = getRequestedFile(request);
                 
